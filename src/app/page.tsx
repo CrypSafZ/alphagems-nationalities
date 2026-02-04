@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import GlassCard from '@/components/GlassCard';
 import SubmissionForm from '@/components/SubmissionForm';
@@ -10,6 +11,16 @@ import ChartToggle from '@/components/ChartToggle';
 import { supabase } from '@/lib/supabase';
 import { initAnalytics } from '@/lib/analytics';
 import { ChartType, CountryCount, StatsResponse } from '@/types';
+
+// Dynamic import for WorldMap (requires client-side only)
+const WorldMap = dynamic(() => import('@/components/WorldMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[300px] md:h-[400px]">
+      <div className="animate-spin h-8 w-8 border-4 border-white/20 border-t-white rounded-full" />
+    </div>
+  ),
+});
 
 export default function Home() {
   const [chartType, setChartType] = useState<ChartType>('bar');
@@ -90,6 +101,16 @@ export default function Home() {
           <h1 className="text-3xl md:text-4xl font-bold text-white text-center">
             Alphagems Nationalities
           </h1>
+        </div>
+
+        {/* World Map Card */}
+        <div className="w-full max-w-6xl mb-6">
+          <GlassCard className="p-6 animate-fade-in">
+            <h2 className="text-xl font-semibold text-white mb-4 text-center">
+              Global Community Map
+            </h2>
+            <WorldMap data={stats} />
+          </GlassCard>
         </div>
 
         {/* Main Content Grid */}
