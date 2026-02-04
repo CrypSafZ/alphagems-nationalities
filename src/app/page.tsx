@@ -1,65 +1,138 @@
-import Image from "next/image";
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import Image from 'next/image';
+import GlassCard from '@/components/GlassCard';
+import SubmissionForm from '@/components/SubmissionForm';
+import BarChartViz from '@/components/BarChartViz';
+import PieChartViz from '@/components/PieChartViz';
+import ChartToggle from '@/components/ChartToggle';
+import { supabase } from '@/lib/supabase';
+import { initAnalytics } from '@/lib/analytics';
+import { ChartType, CountryCount, StatsResponse } from '@/types';
 
 export default function Home() {
+  const [chartType, setChartType] = useState<ChartType>('bar');
+  const [stats, setStats] = useState<CountryCount[]>([]);
+  const [total, setTotal] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const response = await fetch('/api/stats');
+      const data = await response.json();
+      if (data.success) {
+        setStats(data.countries);
+        setTotal(data.total);
+      }
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Initialize analytics
+    initAnalytics();
+
+    // Fetch initial stats
+    fetchStats();
+
+    // Set up realtime subscription
+    const channel = supabase
+      .channel('submissions_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'submissions',
+        },
+        () => {
+          // Refetch stats when new submission is added
+          fetchStats();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchStats]);
+
+  const handleSubmitSuccess = (newStats: StatsResponse) => {
+    setStats(newStats.countries);
+    setTotal(newStats.total);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main
+      className="min-h-screen w-full bg-cover bg-center bg-fixed relative"
+      style={{ backgroundImage: 'url(/background.jpg)' }}
+    >
+      {/* Overlay for better readability */}
+      <div className="absolute inset-0 bg-black/50" />
+
+      {/* Content */}
+      <div className="relative z-10 min-h-screen flex flex-col items-center px-4 py-8">
+        {/* Logo and Header */}
+        <div className="flex flex-col items-center mb-8 animate-fade-in">
+          <Image
+            src="/logo.png"
+            alt="Alphagems Logo"
+            width={120}
+            height={120}
+            className="mb-4"
+            priority
+          />
+          <h1 className="text-3xl md:text-4xl font-bold text-white text-center">
+            Alphagems Nationalities
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Main Content Grid */}
+        <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Submission Form Card */}
+          <GlassCard className="p-6 animate-fade-in">
+            <h2 className="text-xl font-semibold text-white mb-4">
+              Add Your Nationality
+            </h2>
+            <SubmissionForm onSubmitSuccess={handleSubmitSuccess} />
+          </GlassCard>
+
+          {/* Chart Card */}
+          <GlassCard className="p-6 animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-xl font-semibold text-white">
+                  Community Distribution
+                </h2>
+                <p className="text-white/60 text-sm mt-1">
+                  {isLoading ? 'Loading...' : `${total} total submissions`}
+                </p>
+              </div>
+              <ChartToggle chartType={chartType} onToggle={setChartType} />
+            </div>
+
+            {isLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin h-8 w-8 border-4 border-white/20 border-t-white rounded-full" />
+              </div>
+            ) : chartType === 'bar' ? (
+              <BarChartViz data={stats} />
+            ) : (
+              <PieChartViz data={stats} />
+            )}
+          </GlassCard>
         </div>
-      </main>
-    </div>
+
+        {/* Footer */}
+        <footer className="mt-8 text-white/50 text-sm text-center">
+          <p>Made with love by the Alphagems Community</p>
+        </footer>
+      </div>
+    </main>
   );
 }
